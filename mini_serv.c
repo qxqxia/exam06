@@ -1,25 +1,26 @@
-#include <string.h>
 #include <unistd.h>
-#include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
-#include <netinet/in.h>
+#include <stdio.h>
+#include <netinet/ip.h>
 
-int	clients = 0,fd_max = 0;
-int	idx[65536];
+int	clients = 0, max_fd = 0;
+int	ids[65536];
 char	*msg[65536];
-char	rbuf[1025],wbuf[42];
-fd_set	rfds,wfds,fds;
 
-int	extract_message(char **buf,char **msg)
+fd_set	rfds, wfds, fds;
+char	rbuf[1025], wbuf[42];
+
+int extract_message(char **buf, char **msg)
 {
 	char	*newbuf;
 	int	i;
-	
+
 	*msg = 0;
 	if (*buf == 0)
 		return (0);
 	i = 0;
-	while((*buf)[i])
+	while ((*buf)[i])
 	{
 		if ((*buf)[i] == '\n')
 		{
@@ -37,10 +38,10 @@ int	extract_message(char **buf,char **msg)
 	return (0);
 }
 
-char	*str_join(char *buf, char *add)
+char *str_join(char *buf, char *add)
 {
 	char	*newbuf;
-	int	len;
+	int		len;
 
 	if (buf == 0)
 		len = 0;
@@ -65,20 +66,40 @@ void	fatal(void)
 
 void	notify(int from, char *s)
 {
-	for (int fd = 0; fd <= fd_max; fd++)
+	for (int fd = 0; fd <= max_fd; fd++)
 	{
 		if (FD_ISSET(fd, &wfds) && fd != from)
 			send(fd, s, strlen(s), 0);
 	}
 }
 
+void	add_client(int fd)
+{
+	max_fd = fd > max_fd ? fd : max_fd;
+	ids[fd] = clients++;
+	msg[fd] = NULL;
+	FD_SET(fd, &fds);
+	sprintf(wbuf, "server: client %d just arrived\n", ids[fd]);
+	notify(fd, wbuf);
+}
+
+void	remove_client(int fd)
+{
+	sprintf(wbuf, "server: client %d just left\n", ids[fd]);
+	notify(fd, wbuff);
+	free(msg[fd]);
+	msg[fd] = NULL;
+	FD_CLR(fd, &fds);
+	close(fd);
+}
+
 void	deliver(int fd)
 {
 	char	*s;
-	
-	while(extract_message(&(msg[fd]), &s))
+
+	while (extract_message(&(msg[fd]), &s))
 	{
-		sprintf(wbuf, "client %d: ", idx[fd]);
+		sprintf(wbuf, "client %d: ", ids[fd]);
 		notify(fd, wbuf);
 		notify(fd, s);
 		free(s);
@@ -86,88 +107,43 @@ void	deliver(int fd)
 	}
 }
 
-void	add_client(int fd)
-{
-	fd_max = fd > fd_max ? fd : fd_max;
-	idx[fd] = clients++;
-	msg[fd] = NULL;
-	FD_SET(fd, &fds);
-	sprintf(wbuf, "server: client %d just arrived\n", idx[fd]);
-	notify(fd, wbuf);
-}
-
-void	remove_client(int fd)
-{
-	sprintf(wbuf, "server: client %d just left\n", idx[fd]);
-	notify(fd, wbuf);
-	free(msg[fd]);
-	msg[fd] = NULL;
-	FD_CLR(fd, &fds);
-	close(fd);
-}
-
 int	create_socket(void)
 {
-	fd_max = socket(AF_INET, SOCK_STREAM, 0);
-	if (fd_max < 0)
+	max_fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (max_fd < 0)
 		fatal();
-	FD_SET(fd_max, &fds);
-	return (fd_max);
+	FD_SET(max_fd, &fds);
+	return (max_fd);
 }
 
 int	main(int ac, char **av)
 {
 	if (ac != 2)
 	{
-		write(2, "Wrong number of argument\n", 26);
+		write(2, "Wrong number of arguments\n", 26);
 		exit(1);
 	}
 	FD_ZERO(&fds);
-	int	sockfd = create_socket();
-	struct sockaddr_in	servaddr;
+	int sockfd = create_socket();
+	
+	struct sockaddr_in servaddr;
 	bzero(&servaddr, sizeof(servaddr));
 
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_addr.s_addr = htonl(2130706433);
-	servaddr.sin_port = htons(atoi(av[1]));
+	servaddr.sin_port = htons(atoi(av[1])); // replace 8080
 
 	if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)))
-
-		fatal();
-	if (listen(sockfd, SOMAXCONN))
-		fatal();
-	while(42)
+		fatal_error();
+	if (listen(sockfd, SOMAXCONN)) // the main uses 10, SOMAXCONN is 180 on my machine
+		fatal_error();
+	
+	while (1)
 	{
-		rfds = wfds = fds;
-		if (select(fd_max + 1, &rfds, &wfds, NULL, NULL) < 0)
-			fatal();
-		for (int fd = 0; fd <= fd_max; fd++)
-		{
-			if (!FD_ISSET(fd, &rfds))
-				continue;
-			if (fd == sockfd)
-			{
-				socklen_t	addr_len = sizeof(servaddr);
-				int	client = accept(sockfd, (struct sockaddr *)&servaddr, &addr_len);
-				if (client >= 0)
-				{
-					add_client(client);
-					break;
-				}
-			}
-			else
-			{
-				int	readed = recv(fd, rbuf, 1024, 0);
-				if (readed <= 0)
-				{
-					remove_client(fd);
-					break;
-				}
-				rbuf[readed] = '\0';
-				msg[fd] = str_join(msg[fd], rbuf);
-				deliver(fd);
-			}
-		}
+		
 	}
-	return (0);
 }
+
+
+
+
