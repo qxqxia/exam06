@@ -134,14 +134,46 @@ int	main(int ac, char **av)
 	servaddr.sin_port = htons(atoi(av[1])); // replace 8080
 
 	if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)))
-		fatal_error();
+		fatal();
 	if (listen(sockfd, SOMAXCONN)) // the main uses 10, SOMAXCONN is 180 on my machine
-		fatal_error();
+		fatal();
 	
 	while (1)
 	{
-		
+		rfds = wfds = fds;
+
+		if (select(max_fd + 1, &rfds, &wfds, NULL, NULL) < 0)
+			fatal();
+
+		for (int fd = 0; fd <= max_fd; fd++)
+		{
+			if (!FD_ISSET(fd, &rfds))
+				continue;
+			if (fd == sockfd)
+			{
+				socklen_t	addr_len = sizeof(servaddr);
+				int	client_fd = accept(sockfd, (struct sockaddr *)&servaddr, &addr_len);
+				if (client_fd >= 0)
+				{
+					add_client(client_fd);
+					break;
+				}
+			}
+			else
+			{
+				int readed = recv(fd, rbuf, 1024, 0);
+				if (readed <= 0)
+				{
+					remove_client(fd);
+					break;
+				}
+				rbuf[readed] = '\0';
+				msg[fd] = str_join(msg[fd], rbuf);
+				deliver(fd);
+			}
+		}
 	}
+	return (0);
 }
 
 
