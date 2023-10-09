@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <netinet/ip.h>
+#include <netinet/in.h>
 
 int	clients = 0, max_fd = 0;
 int	ids[65536];
