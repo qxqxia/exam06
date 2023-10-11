@@ -1,13 +1,12 @@
 #include <unistd.h>
-#include <string.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <netinet/in.h>
 
 int	clients = 0, max_fd = 0;
 int	ids[65536];
 char	*msg[65536];
-
 fd_set	rfds, wfds, fds;
 char	rbuf[1025], wbuf[42];
 
@@ -58,7 +57,7 @@ char *str_join(char *buf, char *add)
 	return (newbuf);
 }
 
-void	fatal(void)
+void	fatal()
 {
 	write(2, "Fatal error\n", 12);
 	exit(1);
@@ -88,7 +87,6 @@ void	remove_client(int fd)
 	sprintf(wbuf, "server: client %d just left\n", ids[fd]);
 	notify(fd, wbuf);
 	free(msg[fd]);
-	msg[fd] = NULL;
 	FD_CLR(fd, &fds);
 	close(fd);
 }
@@ -107,7 +105,7 @@ void	deliver(int fd)
 	}
 }
 
-int	create_socket(void)
+int	create_socket()
 {
 	max_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (max_fd < 0)
@@ -123,28 +121,32 @@ int	main(int ac, char **av)
 		write(2, "Wrong number of arguments\n", 26);
 		exit(1);
 	}
+
 	FD_ZERO(&fds);
 	int sockfd = create_socket();
-	
-	struct sockaddr_in servaddr;
-	bzero(&servaddr, sizeof(servaddr));
 
-	servaddr.sin_family = AF_INET;
-	servaddr.sin_addr.s_addr = htonl(2130706433);
-	servaddr.sin_port = htons(atoi(av[1])); // replace 8080
+	struct sockaddr_in servaddr; 
+	bzero(&servaddr, sizeof(servaddr)); 
 
-	if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)))
+	// assign IP, PORT 
+	servaddr.sin_family = AF_INET; 
+	servaddr.sin_addr.s_addr = htonl(2130706433); //127.0.0.1
+	servaddr.sin_port = htons(atoi(av[1])); 
+
+	// Binding newly created socket to given IP and verification 
+	if ((bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr))) != 0) { 
 		fatal();
-	if (listen(sockfd, SOMAXCONN)) // the main uses 10, SOMAXCONN is 180 on my machine
-		fatal();
+	} 
+	if (listen(sockfd, SOMAXCONN) != 0) {
+		fatal(); 
+	}
 	
 	while (1)
 	{
 		rfds = wfds = fds;
-
+		
 		if (select(max_fd + 1, &rfds, &wfds, NULL, NULL) < 0)
 			fatal();
-
 		for (int fd = 0; fd <= max_fd; fd++)
 		{
 			if (!FD_ISSET(fd, &rfds))
@@ -152,7 +154,7 @@ int	main(int ac, char **av)
 			if (fd == sockfd)
 			{
 				socklen_t	addr_len = sizeof(servaddr);
-				int	client_fd = accept(sockfd, (struct sockaddr *)&servaddr, &addr_len);
+				int client_fd = accept(sockfd, (struct sockaddr *)&servaddr, &addr_len);
 				if (client_fd >= 0)
 				{
 					add_client(client_fd);
@@ -173,9 +175,6 @@ int	main(int ac, char **av)
 			}
 		}
 	}
-	return (0);
+	return (0);	
 }
-
-
-
 
