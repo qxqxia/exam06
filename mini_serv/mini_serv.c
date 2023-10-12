@@ -89,6 +89,7 @@ void	remove_client(int fd)
 	sprintf(wbuf, "server: client %d just left\n", ids[fd]);
 	notify(fd, wbuf);
 	free(msg[fd]);
+	msg[fd] = NULL;
 	FD_CLR(fd, &fds);
 	close(fd);
 }
