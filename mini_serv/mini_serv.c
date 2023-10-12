@@ -10,6 +10,7 @@ char	*msg[65536];
 fd_set	rfds, wfds, fds;
 char	rbuf[1025], wbuf[42];
 
+//from main
 int extract_message(char **buf, char **msg)
 {
 	char	*newbuf;
@@ -56,6 +57,7 @@ char *str_join(char *buf, char *add)
 	strcat(newbuf, add);
 	return (newbuf);
 }
+//end 
 
 void	fatal()
 {
@@ -125,6 +127,7 @@ int	main(int ac, char **av)
 	FD_ZERO(&fds);
 	int sockfd = create_socket();
 
+	//from main
 	struct sockaddr_in servaddr; 
 	bzero(&servaddr, sizeof(servaddr)); 
 
@@ -140,6 +143,7 @@ int	main(int ac, char **av)
 	if (listen(sockfd, SOMAXCONN) != 0) {
 		fatal(); 
 	}
+	//end
 	
 	while (1)
 	{
